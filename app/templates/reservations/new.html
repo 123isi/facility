@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>예약하기 - 공공시설 예약 시스템</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="/">공공시설 예약 시스템</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/">시설 목록</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/reservations">예약 관리</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/dashboard">통계 대시보드</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <h2>예약하기</h2>
+
+        {% if facility %}
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title">{{ facility.name }}</h5>
+                <h6 class="card-subtitle mb-2 text-muted">{{ facility.type.value }}</h6>
+                <p class="card-text">
+                    <strong>위치:</strong> {{ facility.location }}<br>
+                    {% if facility.capacity %}
+                    <strong>수용 인원:</strong> {{ facility.capacity }}명
+                    {% endif %}
+                </p>
+            </div>
+        </div>
+        <form id="reservationForm" class="needs-validation" novalidate>
+             <input type="hidden" name="facility_id" value="{{ facility.id }}">
+        {% elif facilities %}
+        <form id="reservationForm" class="needs-validation" novalidate>
+            <div class="mb-3">
+                <label for="facilitySelect" class="form-label">시설 선택</label>
+                <select class="form-select" id="facilitySelect" required>
+                    <option value="" disabled selected>시설을 선택하세요</option>
+                    {% for fac in facilities %}
+                        <option value="{{ fac.id }}">{{ fac.name }} - {{ fac.location }}</option>
+                    {% endfor %}
+                </select>
+                <div class="invalid-feedback">
+                    시설을 선택해주세요.
+                </div>
+            </div>
+            <input type="hidden" name="facility_id" id="selectedFacilityId">
+        {% else %}
+        <p>예약 가능한 시설 정보가 없습니다.</p>
+        {% endif %}
+
+        {% if facility or facilities %}
+
+            <div class="mb-3">
+                <label for="user_name" class="form-label">예약자 이름</label>
+                <input type="text" class="form-control" id="user_name" name="user_name" required>
+                <div class="invalid-feedback">
+                    예약자 이름을 입력해주세요.
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <label for="user_phone" class="form-label">연락처</label>
+                <input type="tel" class="form-control" id="user_phone" name="user_phone" required>
+                <div class="invalid-feedback">
+                    연락처를 입력해주세요.
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <label for="start_time" class="form-label">시작 시간</label>
+                <input type="datetime-local" class="form-control" id="start_time" name="start_time" required>
+                <div class="invalid-feedback">
+                    시작 시간을 선택해주세요.
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <label for="end_time" class="form-label">종료 시간</label>
+                <input type="datetime-local" class="form-control" id="end_time" name="end_time" required>
+                <div class="invalid-feedback">
+                    종료 시간을 선택해주세요.
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <label for="purpose" class="form-label">용도</label>
+                <textarea class="form-control" id="purpose" name="purpose" rows="3"></textarea>
+            </div>
+
+            <div class="mb-3">
+                <label for="capacity" class="form-label">인원</label>
+                <input type="number" class="form-control" id="capacity" name="capacity" min="1" required>
+                 <div class="invalid-feedback">
+                    인원을 입력해주세요.
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary">예약하기</button>
+            <a href="/reservations" class="btn btn-secondary">취소</a>
+        {% endif %}
+        </form>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.getElementById('reservationForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            if (!this.checkValidity()) {
+                e.stopPropagation();
+                this.classList.add('was-validated');
+                return;
+            }
+
+            const formData = new FormData(this);
+
+            // Update facility_id from dropdown if it exists
+            const facilitySelect = document.getElementById('facilitySelect');
+            if (facilitySelect) {
+                formData.set('facility_id', facilitySelect.value);
+            }
+
+            const data = {
+                facility_id: parseInt(formData.get('facility_id')),
+                user_name: formData.get('user_name'),
+                user_phone: formData.get('user_phone'),
+                start_time: formData.get('start_time'),
+                end_time: formData.get('end_time'),
+                purpose: formData.get('purpose'),
+                capacity: parseInt(formData.get('capacity'))
+            };
+
+            // Check if facility_id is selected when coming from reservation list
+            if (isNaN(data.facility_id)) {
+                 alert('시설을 선택해주세요.');
+                 return; // Prevent form submission
+            }
+
+            try {
+                const response = await fetch('/reservations/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                if (response.ok) {
+                    alert('예약이 완료되었습니다.');
+                    window.location.href = '/reservations';
+                } else {
+                    const error = await response.json();
+                    alert(error.detail || '예약에 실패했습니다.');
+                }
+            } catch (error) {
+                alert('예약 처리 중 오류가 발생했습니다.');
+            }
+        });
+    </script>
+</body>
+</html>
